@@ -21,7 +21,11 @@ def login_post():
 
     # check if the user actually exists
     # take the user-supplied password and compare it with the stored password
-    if not user or not (user.password == password):
+   
+    checked_password = generate_password_hash(password, method='scrypt', salt_length=8)
+
+    # if not user or not (user.password == password):
+    if not user or not (check_password_hash(checked_password, password)):
         flash('Please check your login details and try again.')
         current_app.logger.warning("User login failed")
         return redirect(url_for('auth.login')) # if the user doesn't exist or password is wrong, reload the page
@@ -34,20 +38,37 @@ def login_post():
 def signup():
     return render_template('signup.html')
 
+
+def sqlHelper(message):
+    sql = ('select * from user where email=?', message)
+    return sql
+
 @auth.route('/signup', methods=['POST'])
 def signup_post():
     email = request.form.get('email')
     name = request.form.get('name')
     password = request.form.get('password')
 
-    user = db.session.execute(text('select * from user where email = "' + email +'"')).all()
+
+    # t = text("SELECT * FROM users WHERE id=:user_id")
+    # result = connection.execute(t, {"user_id": 12})
+
+    #user = db.session.execute(text('select * from user where email = "' + email +'"')).all()
+    t = text("select * from user where email =:user_email")
+    user = db.session.execute(t, {"user_email": email}).all()
+    
+    # user = db.session.execute(email).all()
     if len(user) > 0: # if a user is found, we want to redirect back to signup page so user can try again
         flash('Email address already exists')  # 'flash' function stores a message accessible in the template code.
         current_app.logger.debug("User email already exists")
         return redirect(url_for('auth.signup'))
 
+
     # create a new user with the form data. TODO: Hash the password so the plaintext version isn't saved.
-    new_user = User(email=email, name=name, password=password)
+    
+    hashed_password = generate_password_hash(password, method='scrypt', salt_length=8)
+
+    new_user = User(email=email, name=name, password=hashed_password)
 
     # add the new user to the database
     db.session.add(new_user)
